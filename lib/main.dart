@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:test_new_features/TaskModel.dart';
+import 'package:test_new_features/filterModel.dart';
 
 void main() => runApp(MyApp());
 
@@ -27,11 +29,14 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final String url = "https://pokeapi.co/api/v2/pokemon";
+  final String url =
+      "https://dev-tasks.crossroads-group.com/api/tasks/assigned/paged";
+  final String cookie =
+      "_fbp=fb.1.1585952795850.569407500; jwt-doSsoCookie=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzODI5NTc1Mzc3MTM5ODEyNTEiLCJ1c2VySWQiOiIzODI5NTc1Mzc3MTM5ODEyNTEiLCJleHBpcmVzSW4iOjI1OTIwMDAsImlhdCI6MTU4ODU5OTA5NCwiZXhwIjoxNTkxMTkxMDk0fQ.XTmOMq1_tFnD-dmkv3nAOWkTm6I-inwnWLrVH6v8yx4; crgSsoSessionId=FyJCD5oW6qDSSpMaXn5zcnFRMcnyGFS4; crgSsoSessionId_expiration=1589223685785";
   RefreshController _refreshController =
       RefreshController(initialRefresh: false);
-  List<dynamic> pokemon = [];
-  int offset = 20, limit = 20;
+  List<TaskModel> tasks = [];
+  FilterModel filterModel = FilterModel();
 
   @override
   void initState() {
@@ -40,28 +45,23 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void callData() async {
-    var response =
-        await Dio().get(url, queryParameters: {"offset": 0, "limit": 20});
-    setState(() {
-      pokemon = response.data["results"];
+    var response = await Dio(BaseOptions(headers: {"cookie": cookie})).get(
+      url,
+      queryParameters: filterModel.getShortParams,
+    );
+    response.data["assigned"].forEach((data) {
+      tasks.add(TaskModel.fromJson(data));
     });
-  }
-
-  void _onRefresh() async {
-    // monitor network fetch
-    await Dio()
-        .get(url, queryParameters: {"offset": offset + 20, "limit": limit});
-    // if failed,use refreshFailed()
-    _refreshController.refreshCompleted();
+    setState(() {});
   }
 
   void _onLoading() async {
     // monitor network fetch
-    var response = await Dio()
-        .get(url, queryParameters: {"offset": offset + 20, "limit": limit});
-    offset += 20;
-    response.data["results"].forEach((data) {
-      pokemon.add(data);
+    filterModel.pageNumber += 1;
+    var response = await Dio(BaseOptions(headers: {"cookie": cookie}))
+        .get(url, queryParameters: filterModel.getShortParams);
+    response.data["assigned"].forEach((data) {
+      tasks.add(TaskModel.fromJson(data));
     });
     // if failed,use loadFailed(),if no data return,use LoadNodata()
     if (mounted) setState(() {});
@@ -99,13 +99,12 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         ),
         controller: _refreshController,
-        onRefresh: _onRefresh,
         onLoading: _onLoading,
         child: ListView.builder(
           itemBuilder: (c, i) =>
-              Card(child: Center(child: Text("Data: ${pokemon[i]["name"]}"))),
+              Card(child: Center(child: Text("Data: ${tasks[i].name}"))),
           itemExtent: 100.0,
-          itemCount: pokemon.length,
+          itemCount: tasks.length,
         ),
       ),
     );
